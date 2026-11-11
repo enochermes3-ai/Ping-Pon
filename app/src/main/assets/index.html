@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ping Pong Clásico</title>
+<style>
+html,body{height:100%;margin:0;background:#000;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+body{display:flex;align-items:center;justify-content:center}
+canvas{width:min(100vw,200vh);height:min(50vw,100vh);background:#000;touch-action:none}
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="400"></canvas>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const W=800,H=400,PW=10,PH=70,WIN=7;
+let state='menu',pl,cpu,ball,sc=[0,0],keys={},msg='';
+let ac=null;
+function beep(f,d){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.type='square';o.frequency.value=f;g.gain.value=.05;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
+function reset(dir){ball={x:W/2,y:H/2,vx:5*dir,vy:(Math.random()*4-2),r:6}}
+function init(){pl={x:20,y:H/2-PH/2};cpu={x:W-20-PW,y:H/2-PH/2};sc=[0,0];reset(Math.random()<.5?1:-1)}
+init();
+function toggle(){
+  if(state==='over'){init();state='play';return}
+  state=state==='play'?'pause':'play';
+}
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=1;if(e.code==='Space'){e.preventDefault();toggle()}if(e.key.startsWith('Arrow'))e.preventDefault()});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=0);
+function pointer(e){const r=c.getBoundingClientRect();pl.y=(e.clientY-r.top)*(H/r.height)-PH/2}
+c.addEventListener('pointermove',pointer);
+c.addEventListener('pointerdown',e=>{pointer(e);if(state!=='play')toggle()});
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function bounce(p,dir){
+  const rel=(ball.y-(p.y+PH/2))/(PH/2);
+  const sp=Math.min(Math.hypot(ball.vx,ball.vy)*1.05,13);
+  const ang=rel*Math.PI/4;
+  ball.vx=dir*sp*Math.cos(ang);ball.vy=sp*Math.sin(ang);
+  beep(440,.06);
+}
+function update(){
+  if(state!=='play')return;
+  if(keys['w']||keys['arrowup'])pl.y-=7;
+  if(keys['s']||keys['arrowdown'])pl.y+=7;
+  pl.y=clamp(pl.y,0,H-PH);
+  const t=ball.y-PH/2,d=ball.vx>0?t-cpu.y:(H/2-PH/2)-cpu.y;
+  cpu.y+=clamp(d,-4.2,4.2);cpu.y=clamp(cpu.y,0,H-PH);
+  ball.x+=ball.vx;ball.y+=ball.vy;
+  if(ball.y<ball.r){ball.y=ball.r;ball.vy*=-1;beep(220,.05)}
+  if(ball.y>H-ball.r){ball.y=H-ball.r;ball.vy*=-1;beep(220,.05)}
+  if(ball.vx<0&&ball.x-ball.r<pl.x+PW&&ball.x>pl.x&&ball.y>pl.y&&ball.y<pl.y+PH){ball.x=pl.x+PW+ball.r;bounce(pl,1)}
+  if(ball.vx>0&&ball.x+ball.r>cpu.x&&ball.x<cpu.x+PW&&ball.y>cpu.y&&ball.y<cpu.y+PH){ball.x=cpu.x-ball.r;bounce(cpu,-1)}
+  if(ball.x<-10||ball.x>W+10){
+    const who=ball.x<0?1:0;sc[who]++;beep(120,.25);
+    if(sc[who]>=WIN){state='over';msg=who===0?'¡GANASTE!':'PERDISTE'}
+    else reset(who===0?-1:1);
+  }
+}
+function draw(){
+  x.fillStyle='#000';x.fillRect(0,0,W,H);
+  x.fillStyle='#fff';
+  for(let y=5;y<H;y+=24)x.fillRect(W/2-2,y,4,14);
+  x.fillRect(pl.x,pl.y,PW,PH);x.fillRect(cpu.x,cpu.y,PW,PH);
+  x.fillRect(ball.x-ball.r,ball.y-ball.r,ball.r*2,ball.r*2);
+  x.font='bold 48px "Courier New",monospace';x.textAlign='center';
+  x.fillText(sc[0],W/2-60,56);x.fillText(sc[1],W/2+60,56);
+  x.font='bold 24px "Courier New",monospace';
+  if(state==='menu')x.fillText('PING PONG · TOCA PARA JUGAR',W/2,H/2+90);
+  if(state==='pause')x.fillText('PAUSA · TOCA PARA SEGUIR',W/2,H/2+90);
+  if(state==='over'){x.font='bold 40px "Courier New",monospace';x.fillText(msg,W/2,H/2+80);x.font='bold 20px "Courier New",monospace';x.fillText('TOCA PARA JUGAR OTRA VEZ',W/2,H/2+115)}
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')state='pause'});
+(function loop(){update();draw();requestAnimationFrame(loop)})();
+</script>
+</body>
+</html>
